@@ -33,7 +33,7 @@ Once `requirements.txt` has been regenerated from a clean virtual environment co
 
 A Kafka broker must be running and reachable at `localhost:9092`. Installing `confluent-kafka` installs the Python client only.
 
-Create the `timer` topic:
+Create the `BookLecture` topic:
 
 ```bash
 python admin.py

@@ -14,21 +14,17 @@ conf = {'bootstrap.servers': 'localhost:9092',
 producer = Producer(conf)
 
 # %%
-topic='timer'
-message='The time is now '
-# %% Streaming Query
-duration = 5 # Streaming window in minutes
-start_time = datetime.now() # Current clock time
-stop_time = start_time + timedelta(minutes=duration) #start+duration=stop
+topic='BookLecture'
 
-while datetime.now() < stop_time:
-  time_now = datetime.now().strftime("%H:%M:%S")
-  producer.produce(
-    topic=topic,
-    value=message + time_now
-  )
-  print(message + time_now)
-  time.sleep(1)
+with open("book.txt", encoding="utf-8") as f:
+    for line in f:
+        producer.produce(
+            topic=topic,
+            value=line.encode("utf-8")
+        )
+        producer.poll(0)
+        print(line.rstrip())
+        time.sleep(1)
 
 producer.flush()
 producer.close()
