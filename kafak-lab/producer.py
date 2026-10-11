@@ -1,4 +1,5 @@
 # %%
+import os
 import socket
 import time
 from confluent_kafka import Producer
@@ -15,6 +16,8 @@ producer = Producer(conf)
 
 # %%
 topic='BookLecture'
+# Seconds between two lines; set PRODUCER_DELAY=0 to send the whole book at once
+delay = float(os.environ.get('PRODUCER_DELAY', '1'))
 
 with open("book.txt", encoding="utf-8") as f:
     for line in f:
@@ -24,7 +27,7 @@ with open("book.txt", encoding="utf-8") as f:
         )
         producer.poll(0)
         print(line.rstrip())
-        time.sleep(1)
+        time.sleep(delay)
 
 producer.flush()
 producer.close()
