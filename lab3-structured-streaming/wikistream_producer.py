@@ -24,7 +24,17 @@ producer = Producer(conf)
 stream = EventStreams(
   streams=['recentchange', 'revision-create'], since='20260209'
 )
-stream.register_filter(server_name='fr.wikipedia.org', type='edit')
+# Anglais ou français, éditions et nouvelles pages seulement.
+stream.register_filter(
+    server_name=('en.wikipedia.org', 'fr.wikipedia.org'),
+    type=('edit', 'new'),
+)
+
+# namespace 0 = articles. On ignore discussions, fichiers, pages utilisateur.
+stream.register_filter(namespace=0)
+
+# On écarte les robots pour ne garder que les éditions humaines.
+stream.register_filter(bot=False)
 
 # %% Query EventStream
 # Run a single query and inspect raw and example formatted output
