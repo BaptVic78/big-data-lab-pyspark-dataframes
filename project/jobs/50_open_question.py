@@ -71,10 +71,12 @@ def pair_comparison(movies, principals, crew, names, min_shared=3,
         .withColumn("actor_other_mean_rating",
                     (F.col("actor_rating_sum") - F.col("shared_rating_sum"))
                     / F.col("actor_other_movies"))
-        .withColumn("vs_director_others", F.col("shared_mean_rating")
-                    - F.col("director_other_mean_rating"))
-        .withColumn("vs_actor_others", F.col("shared_mean_rating")
-                    - F.col("actor_other_mean_rating"))
+        # IMDb scores have one decimal place. Remove arithmetic noise before
+        # testing strict improvements over the two outside-pair baselines.
+        .withColumn("vs_director_others", F.round(F.col("shared_mean_rating")
+                    - F.col("director_other_mean_rating"), 10))
+        .withColumn("vs_actor_others", F.round(F.col("shared_mean_rating")
+                    - F.col("actor_other_mean_rating"), 10))
         .withColumn("above_both_baselines",
                     (F.col("vs_director_others") > 0)
                     & (F.col("vs_actor_others") > 0))

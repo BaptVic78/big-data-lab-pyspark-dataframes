@@ -35,6 +35,21 @@ def check_pairs(spark):
     tied = movies.withColumn("averageRating", q.F.lit(6.0))
     tied_pairs, _ = q.pair_comparison(tied, principals, crew, names)
     assert not tied_pairs.first().above_both_baselines
+    # Different baseline sizes must not turn a fractional-rating tie positive.
+    fractional = movies.withColumn("averageRating", q.F.lit(6.3))
+    extra = spark.createDataFrame(
+        [("m9", "Extra director film", 2000, 6.3, 1000),
+         ("m10", "Extra actor film", 2000, 6.3, 1000)], movies.schema)
+    more_principals = principals.unionByName(spark.createDataFrame(
+        [("m10", "a", "actor")], principals.schema))
+    more_crew = crew.unionByName(spark.createDataFrame(
+        [("m9", ["d"])], crew.schema))
+    fractional_pairs, _ = q.pair_comparison(
+        fractional.unionByName(extra), more_principals, more_crew, names)
+    fractional_pair = fractional_pairs.first()
+    assert fractional_pair.vs_director_others == 0
+    assert fractional_pair.vs_actor_others == 0
+    assert not fractional_pair.above_both_baselines
     summary = q.summarize(pairs).first()
     assert summary.eligible_pairs == 1 and summary.pct_above_both == 100
     empty = q.summarize(pairs.filter("false")).first()

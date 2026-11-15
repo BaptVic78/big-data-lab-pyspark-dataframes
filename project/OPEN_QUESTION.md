@@ -14,6 +14,8 @@ person also needs at least three qualifying films outside that pair. A
 shared film is removed from both outside-pair baselines. All means give
 each film equal weight. The job exports the two rating differences, a flag
 for pairs strictly above both baselines, and the shared films as evidence.
+Differences are rounded to ten decimal places before testing improvement,
+so floating-point noise cannot turn a rating tie into a positive result.
 The aggregate summary gives each eligible pair equal weight, so the same
 film or person may contribute to several pairs. This is a descriptive
 comparison; genre, release year, selection and repeated observations can
