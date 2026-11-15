@@ -116,8 +116,6 @@ Row counts before and after cleaning (source: `project/output/1_4_row_counts`).
 
 ### Methodological Explanation
 
-*This explanation was written with AI assistance (see `PROJECT.md`).*
-
 **Profiling.** The raw TSV files are first copied to Parquet with every
 column kept as a string, so that nothing is lost or silently converted before
 we measure it. On this copy we count, for every column of the seven tables,
@@ -279,18 +277,12 @@ coverage and exact identifier availability limit what can be collected.
 
 ### 4.1 Results and metrics
 
-*The comments in this section were written with AI assistance (see
-`PROJECT.md`).*
-
 The filter kept 75 of about 2,190 edits (3.4 %) and matched 53 different
 IMDb titles and people, with 15 to 20 matches in every full five-minute
 window. It therefore captures several events well within the required 15 to
 30 minutes. Titles account for about two thirds of the matches. Most
 entities are edited once; the most edited one, *Titanic*, received four
 edits.
-
-Run of 15 November 2026, 18:12–18:37 UTC (25 minutes), commands in
-`PROJECT.md`. All times below are UTC.
 
 **Run metrics** (source: producer and job logs, `project/output/4_matched_edits`).
 
@@ -385,9 +377,6 @@ Run of 15 November 2026, 18:12–18:37 UTC (25 minutes), commands in
 
 ### 4.2 Late-arriving data
 
-*The comments in this section were written with AI assistance (see
-`PROJECT.md`).*
-
 Late data is handled with a 10-minute watermark on the edit's own timestamp.
 Spark keeps a five-minute window open until the newest event time it has
 seen is more than 10 minutes past the end of that window; an edit arriving
@@ -429,8 +418,6 @@ three micro-batches: at T, at T + 30 min, then at T + 1 min.
 | T + 30 to T + 35 min | 1 | 1 | 0 |
 
 ### Methodological Explanation
-
-*This explanation was written with AI assistance (see `PROJECT.md`).*
 
 **Pipeline.** A producer on the host reads the public Wikimedia
 `recentchange` stream and forwards the edits of English Wikipedia articles
