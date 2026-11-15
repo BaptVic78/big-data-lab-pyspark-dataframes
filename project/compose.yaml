@@ -1,0 +1,54 @@
+name: imdb-project
+
+services:
+  kafka:
+    image: apache/kafka-native:4.1.1
+    container_name: imdb_kafka
+    ports:
+      - "29092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:19092,EXTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:19092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    mem_limit: 768m
+    networks:
+      - kafka-spark-net
+
+  spark:
+    image: quay.io/jupyter/pyspark-notebook:spark-4.2.0
+    container_name: imdb_spark
+    user: root
+    ports:
+      - "8888:8888"
+      - "4040:4040"
+    environment:
+      - NB_UID=${UID:-1000}
+      - NB_GID=${GID:-1000}
+      - CHOWN_EXTRA=/home/jovyan/work,/home/jovyan/jobs,/home/jovyan/data,/home/jovyan/output
+      - CHOWN_EXTRA_OPTS=-R
+      # Read by jobs/common.py; lower it if Docker has less than ~7 GB.
+      - SPARK_DRIVER_MEMORY=4g
+      # Lets `python job.py` import pyspark outside of Jupyter.
+      - PYTHONPATH=/usr/local/spark/python:/usr/local/spark/python/lib/py4j-0.10.9.9-src.zip:/home/jovyan/jobs
+    volumes:
+      - ./notebooks:/home/jovyan/work
+      - ./jobs:/home/jovyan/jobs
+      - ./data:/home/jovyan/data
+      - ./output:/home/jovyan/output
+    mem_limit: 6g
+    networks:
+      - kafka-spark-net
+    depends_on:
+      - kafka
+
+networks:
+  kafka-spark-net:
+    driver: bridge
