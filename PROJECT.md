@@ -29,7 +29,8 @@ project/
 - Docker Desktop with **at least 7 GB of memory** allocated to Docker
   (Settings → Resources). The Spark container is capped at 6 GB with a 4 GB
   driver; lower `SPARK_DRIVER_MEMORY` in `project/compose.yaml` if needed.
-- Python 3.9+ on the host.
+- Python 3.10+ on the host (the pinned `requests==2.34.2` requires
+  Python >= 3.10).
 - About 10 GB of free disk space.
 
 ## Setup from scratch
@@ -91,8 +92,3 @@ docker compose down
 ## Use of AI / LLM tools
 
 - OpenAI Codex assisted with PR review, setup verification, and the contributor table.
-- **Claude Code (Anthropic, model Claude Opus 5.5)** was used as a coding
-  assistant for: the Docker/compose setup, the IMDb download and ingestion
-  scripts, and the PySpark jobs (details are listed per pull request).
-- No AI tool was used to write the explanations, reasoning or methodology
-  sections of `REPORT.md`; they were written by the group members.
