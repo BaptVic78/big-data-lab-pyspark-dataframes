@@ -11,28 +11,28 @@ requests from their own GitHub account. Each person also writes the
 
 | Person | Tasks (one branch and PR each) | Reviewed by |
 | ------ | ------------------------------ | ----------- |
-| Axel | Project init ✅, Data preparation, Streaming | Nils |
-| Nils | Exploration questions 1–8 (two PRs: 2.1–2.4 and 2.5–2.8) | Victor |
-| Victor | Enrichment (Wikipedia scraping), Open question | Axel |
+| Axel | Project init ✅, Data preparation, Streaming | Victor |
+| Victor | Exploration questions 1–8 (two PRs: 2.1–2.4 and 2.5–2.8) | Nils |
+| Nils | Enrichment (Wikipedia scraping), Open question | Axel |
 
-PR #1 (project init) was reviewed and approved by Victor before this plan
+PR #1 (project init) was reviewed and approved by Nils before this plan
 was agreed.
 
 ### Branches
 
 | Owner | Task | Branch | `REPORT.md` section | Reviewer |
 | ----- | ---- | ------ | ------------------- | -------- |
-| Axel (axou947) | Project init ✅ (PR #1) | `feat/project-init` | – | Victor (done) |
-| Axel (axou947) | Data preparation | `feat/data-preparation` | 1 | Nils |
-| Axel (axou947) | Streaming | `feat/streaming` | 4 | Nils |
-| Nils (nilsgrd) | Exploration, questions 2.1–2.4 | `feat/exploration-part-1` | 2.1–2.4 | Victor |
-| Nils (nilsgrd) | Exploration, questions 2.5–2.8 | `feat/exploration-part-2` | 2.5–2.8 | Victor |
-| Victor (BaptVic78) | Enrichment (Wikipedia scraping) | `feat/enrichment` | 3 | Axel |
-| Victor (BaptVic78) | Open question | `feat/open-question` | 5 | Axel |
+| Axel (axou947) | Project init ✅ (PR #1) | `feat/project-init` | – | Nils (done) |
+| Axel (axou947) | Data preparation | `feat/data-preparation` | 1 | Victor |
+| Axel (axou947) | Streaming | `feat/streaming` | 4 | Victor |
+| Victor (BaptVic78) | Exploration, questions 2.1–2.4 | `feat/exploration-part-1` | 2.1–2.4 | Nils |
+| Victor (BaptVic78) | Exploration, questions 2.5–2.8 | `feat/exploration-part-2` | 2.5–2.8 | Nils |
+| Nils (nilsgrd) | Enrichment (Wikipedia scraping) | `feat/enrichment` | 3 | Axel |
+| Nils (nilsgrd) | Open question | `feat/open-question` | 5 | Axel |
 | Axel (axou947) | Submission email to `joe@adaltas.com` | – | – | – |
 
 Each section's **Methodological Explanation** is written by the owner of that
-section. Nils writes the shared Methodological Explanation for section 2.
+section. Victor writes the shared Methodological Explanation for section 2.
 
 ### What each task covers
 
@@ -40,17 +40,17 @@ section. Nils writes the shared Methodological Explanation for section 2.
   of every table, the top 5 columns by % of nulls, other quality issues
   (death before birth, orphan foreign keys, impossible values), and the
   cleaning that writes the `clean` layer.
-- **Exploration part 1 (Nils):**
+- **Exploration part 1 (Victor):**
   - 2.1 feature-length movies whose runtime is far from their genre average
   - 2.2 top 3 genres per year, 1980–2025
   - 2.3 how those top 3 genres compare to the other genres
   - 2.4 directors with exactly one movie rated ≥ 8.0 and their other movies averaging ≤ 6.0
-- **Exploration part 2 (Nils):**
+- **Exploration part 2 (Victor):**
   - 2.5 TV series with the worst episode in the last season and the best one in seasons 1–2
   - 2.6 actors successful in 2+ and 3+ languages
   - 2.7 careers of 20+ years and 15+ movies that peaked early
   - 2.8 multi-talented professionals, and how they perform when holding several roles on one film
-- **Enrichment (Victor):** synopsis for the top 10 films per genre and year
+- **Enrichment (Nils):** synopsis for the top 10 films per genre and year
   (1980–2025), plus a biography for at least 3 principals of each film.
   Data comes from Wikipedia or another human-written open source. Respect
   rate limits, add a source-URL lineage field to every record, and write a
@@ -61,7 +61,7 @@ section. Nils writes the shared Methodological Explanation for section 2.
   Structured Streaming, which keeps only edits that match our IMDb titles or
   people. The filter must capture several events within 15–30 minutes. Late
   data is handled with watermarks.
-- **Open question (Victor):** our own non-trivial question that needs
+- **Open question (Nils):** our own non-trivial question that needs
   multi-table joins. Ideas:
   1. Do recurring director–actor duos (3+ films together) get better ratings
      than each of them gets with other partners? (IMDb data only)
@@ -81,7 +81,7 @@ PR #1 setup ──► data preparation ──► exploration 1 & 2
 
 You **don't need to wait** for data preparation to merge before writing
 code. Write your jobs against the `clean` layer format below, and test them
-once the preparation PR is merged. Victor can start the Wikipedia fetching
+once the preparation PR is merged. Nils can start the Wikipedia fetching
 script right away.
 
 ## Suggested timeline (Paris time)
