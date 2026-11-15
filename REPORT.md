@@ -140,7 +140,88 @@ Row counts before and after cleaning (source: `project/output/1_4_row_counts`).
 
 ## 3. Data enrichment
 
+### 3.1 Selection and collection coverage
+
+The target selection and enrichment pipeline ran on the full clean IMDb
+dataset. The Wikipedia collection is **incomplete**: only **1 of 8,214
+selected films** currently has both a synopsis and three principal biographies.
+The other films must not be treated as successfully enriched.
+
+Sources: `project/output/3_selected_films`, `3_requests`,
+`3_coverage` and `3_coverage_summary`, generated on 15 November 2026.
+
+| Measure | Result |
+| --- | ---: |
+| Release years | 1980–2025 |
+| Genre/year groups with eligible films | 1,074 |
+| Film/genre/year selections | 10,199 |
+| Distinct selected films | 8,214 |
+| Distinct principal candidates | 58,439 |
+| Unique film and person retrieval requests | 66,653 |
+| Films with a synopsis and three biographies | 1 |
+| Films still incomplete | 8,213 |
+| Available film/biography links, capped at three per film | 30 |
+
+A film can appear in several genres, so 10,199 selections do not represent
+10,199 different films. A biography can also be reused for a person credited
+on several films: the 30 links are not 30 different people.
+
+### 3.2 Verified example
+
+*The Shawshank Redemption* (`tt0111161`, 1994) has a verified plot section
+and biographies for its first three selected principals. The source pages
+were matched to the exact IMDb identifiers through Wikidata. The links below
+identify the retrieved Wikipedia revisions.
+
+| Record | IMDb ID | Source revision |
+| --- | --- | --- |
+| Film synopsis | tt0111161 | [The Shawshank Redemption](https://en.wikipedia.org/w/index.php?oldid=1385870872) |
+| Tim Robbins | nm0000209 | [Biography](https://en.wikipedia.org/w/index.php?oldid=1384219365) |
+| Morgan Freeman | nm0000151 | [Biography](https://en.wikipedia.org/w/index.php?oldid=1384898723) |
+| Bob Gunton | nm0348409 | [Biography](https://en.wikipedia.org/w/index.php?oldid=1362769678) |
+
+The retrieved text, source URLs, revision URLs, collection timestamps and
+license URLs are stored in `project/data/enrichment/wikipedia/` and exported
+through `project/output/3_film_synopses` and `3_principal_biographies`.
+The cache and full exports are generated locally and are not committed.
+
+### 3.3 Remaining work
+
+The full request list still needs to be collected. Pending requests are
+labelled `not_fetched`; they are not evidence that a Wikipedia page is absent.
+The pipeline separately records unverified matches, missing plot sections
+and request errors. It can resume from its cache, then regenerate coverage
+without repeating successful requests. The current example validates the
+complete retrieval/join workflow but does not establish full coverage.
+
 ### Methodological Explanation
+
+`30_enrichment.py prepare` selects feature films (`titleType = movie`,
+runtime greater than 40 minutes) released between 1980 and 2025 with an IMDb
+rating and at least one vote. Within each genre/year group, films are ordered
+by rating, then number of votes, then IMDb ID. Up to ten films are retained.
+There is no additional popularity floor, so a highly rated film with few
+votes can be selected. These ratings and vote counts describe the downloaded
+snapshot, not their values at the time of release.
+
+Principal credits are deduplicated per film/person and ordered by their IMDb
+credit ordering. Up to ten candidates per film provide alternatives when a
+biography is unavailable. This uses principal credits rather than a complete
+cast list. The final export retains the first three successful biographies.
+
+The host fetcher retrieves English Wikipedia prose only after an exact
+Wikidata P345/IMDb match. A film's Plot, Synopsis or Plot summary section is
+used for its synopsis; a person's page introduction is used for a biography.
+An unrelated search result or a film introduction without a plot section is
+not accepted as a successful synopsis. Requests are sequential, at least one
+second apart, with a descriptive User-Agent, `maxlag`, retries and backoff.
+Each entity has an atomic JSON cache record with its source lineage.
+
+Text normalization and joins are performed in Spark during `finalize`.
+Coverage is counted once per distinct selected film. Completion requires a
+successful synopsis and at least three distinct principal biographies.
+Missing text is kept separate from successful retrievals. English Wikipedia
+coverage and exact identifier availability limit what can be collected.
 
 ## 4. Streaming data processing
 
@@ -286,8 +367,102 @@ three micro-batches: at T, at T + 30 min, then at T + 1 min.
 
 ### 5.1 Question and motivation
 
+**Do recurring director–actor pairs receive higher IMDb ratings than each
+person receives on films outside that pair?** Comparing a pair with each
+member's own other films gives two personal reference points instead of
+comparing only with the overall movie average.
+
 ### 5.2 Results
+
+In the selected sample, **1,257 of 2,470 eligible pairs (50.89%)** have a
+strictly higher mean rating than both reference groups. This is a small
+majority, not a general rule that repeated collaborations perform better.
+
+Sources: `project/output/5_parameters`, `5_pair_summary`,
+`5_pair_comparison` and `5_shared_movies`. The corrected full-data run on
+15 November 2026 completed in 136 seconds on Spark 4.2.0.
+
+| Sample or eligibility rule | Value |
+| --- | ---: |
+| Release years | 1980–2025 |
+| Minimum IMDb votes per film | 1,000 |
+| Eligible rated feature films | 40,061 |
+| Minimum shared films per pair | 3 |
+| Minimum outside-pair films for each person | 3 |
+| Eligible director–actor pairs | 2,470 |
+| Pair/film evidence rows | 9,273 |
+
+Each film has equal weight within a pair's or person's mean. Each pair has
+equal weight in the following summary. Differences are rating points on the
+IMDb 1–10 scale, not percentage changes.
+
+| Shared-film mean minus outside-pair mean | Mean across pairs | Median across pairs |
+| --- | ---: | ---: |
+| Director's other films | +0.196 | +0.197 |
+| Actor's other films | +0.265 | +0.292 |
+
+The three categories below are mutually exclusive. A tie does not count as
+an improvement.
+
+| Pair's mean rating is strictly higher than | Pairs | Share |
+| --- | ---: | ---: |
+| Both personal reference groups | 1,257 | 50.89% |
+| Exactly one personal reference group | 738 | 29.88% |
+| Neither personal reference group | 475 | 19.23% |
+| Total | 2,470 | 100.00% |
+
+The five eligible pairs with the most shared films illustrate the different
+outcomes. These counts concern qualifying films in this sample, not complete
+career collaboration counts. Ties in frequency use director and actor IDs.
+
+| Director | Actor | Shared films | Shared mean | Difference vs director's others | Difference vs actor's others |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Kartal Tibet | Kemal Sunal | 23 | 6.791 | +1.948 | -0.109 |
+| Johnnie To | Suet Lam | 20 | 6.775 | +0.116 | +0.923 |
+| David Dhawan | Govinda | 16 | 6.000 | +0.982 | +0.376 |
+| Kunihiko Yuyama | Ikue Otani | 16 | 5.975 | +0.008 | -0.825 |
+| Priyadarshan | Mohanlal | 15 | 7.513 | +0.822 | +0.612 |
 
 ### 5.3 Key takeaways
 
+The average differences are positive against both personal reference groups,
+but 1,213 pairs do not exceed both. A pair can improve on the director's other
+films while remaining below the actor's other films, as the first example
+shows. The two comparisons therefore answer different parts of the question.
+
+These results describe an association. Successful films may encourage people
+to work together again, and genre, release year, franchises or other factors
+may affect both collaboration and ratings. None of those effects is isolated
+here. The vote threshold also excludes less widely rated films, while acting
+credits cover IMDb principals rather than every cast member. Repeated people
+and films make pairs overlap, so the observations are not independent.
+
 ### Methodological Explanation
+
+`50_open_question.py` joins feature-film titles, ratings, acting principals,
+director crew arrays and names. Eligible films run over 40 minutes, were
+released in 1980–2025 and have at least 1,000 votes in the downloaded snapshot.
+Unrated films and films below the vote threshold are excluded from both
+shared-film and outside-pair calculations.
+
+Actor and actress categories are combined. Each actor/film and director/film
+credit is counted once, including repeated IDs in crew arrays. Co-directed
+films contribute to each credited director; actor/director self-pairs are
+excluded. A pair needs at least three shared qualifying films, and each member
+needs at least three other qualifying films in the same population.
+
+For each pair, all shared films are removed from both personal reference
+groups. Absence of a matching principal credit is interpreted within these
+tables, not as proof that a person never appeared in the full cast. The two
+differences are `shared mean - director's outside-pair mean` and
+`shared mean - actor's outside-pair mean`. Differences are rounded to ten
+decimal places before testing whether both are positive. This removes
+floating-point noise that otherwise incorrectly classified three rating ties
+as improvements in the initial run.
+
+The aggregate means and medians describe pair-level differences. They do not
+pool all films into one shared-film score, and the 9,273 evidence rows are
+pair/film observations rather than 9,273 distinct films. Regression checks
+cover duplicate credits, self-pairs, year/vote boundaries, insufficient
+reference groups, fractional-rating ties and empty outputs. Independent CSV
+checks reconcile pair counts, rating differences and shared-film evidence.
