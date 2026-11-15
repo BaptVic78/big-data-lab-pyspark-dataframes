@@ -84,6 +84,7 @@ Each step reads the output of the previous ones, so run them in order.
 | ---- | ------- | ------ |
 | Ingest | `docker compose exec spark python /home/jovyan/jobs/00_ingest.py` | `data/parquet/` |
 | Data preparation (~30 min) | `docker compose exec spark python /home/jovyan/jobs/10_preparation.py` | `data/clean/`, `output/1_*` |
+| [Open question](project/OPEN_QUESTION.md) | `docker compose exec spark python /home/jovyan/jobs/50_open_question.py` | `output/5_*` |
 | Streaming (25 min) | see "Streaming" below | `output/4_*` |
 | Exploration 2.1–2.4 | `docker compose exec spark python /home/jovyan/jobs/20_exploration_part1.py` | `output/2_1_*` through `output/2_4_*` |
 | Exploration 2.5–2.8 | `docker compose exec spark python /home/jovyan/jobs/21_exploration_part2.py` | `output/2_5_*` through `output/2_8_*` |
