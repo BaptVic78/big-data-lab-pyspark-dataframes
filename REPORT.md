@@ -116,7 +116,59 @@ Row counts before and after cleaning (source: `project/output/1_4_row_counts`).
 
 ### Methodological Explanation
 
-<!-- TODO (Axel): write this section yourself, without AI. -->
+*This explanation was written with AI assistance (see `PROJECT.md`).*
+
+**Profiling.** The raw TSV files are first copied to Parquet with every
+column kept as a string, so that nothing is lost or silently converted before
+we measure it. On this copy we count, for every column of the seven tables,
+three kinds of missing value: real nulls, IMDb's `\N` placeholder, and empty
+or whitespace-only strings. In practice everything missing is written as
+`\N`. The five columns with the most missing values are optional by nature
+(attributes of an alternative title, end year of a series, death and birth
+year of a person, job of a principal), so a high percentage there describes
+the data and is not an error.
+
+**Typing.** Missing values of all three kinds become real nulls. Numbers are
+converted with `try_cast`, which gives null instead of failing on a value
+that is not a number. Booleans written 0 or 1 become true or false. Lists
+become arrays: genres, professions, directors, writers and known-for titles
+are separated by commas, while `types` and `attributes` in `title_akas` are
+separated by the control character `\x02`, which was found by inspecting
+real multi-value records during the review.
+
+**Handling rules.** We applied three rules, chosen to lose as little data as
+possible.
+
+- A value that cannot be true is set to null and the row is kept: a runtime
+  of zero or of more than one week, a death year before the birth year, a
+  lifespan over 120 years, an end year before the start year. The rest of
+  the row is still usable.
+- A row whose foreign key points to a missing parent is removed from the
+  child table (for example a principal whose person is not in
+  `name_basics`), and a missing id inside an array is removed from the
+  array. Every join on the clean layer then finds its parent.
+- A value that is unusual but possible is kept: titles announced for a
+  future year, people with a birth year and no death year who would be over
+  120, episodes without a season number, and people who died two or more
+  years before a title's release.
+
+A principal born after the release of the title is also removed, except for
+archive credits. The effect on volume is small: 10,602 rows removed out of
+about 217 million, of which 10,575 are in `title_principals`.
+
+**Alternatives and trade-offs.** Dropping every row with an impossible value
+would have been simpler but would remove titles and people that are valid
+apart from one field. Keeping orphan rows would preserve every raw row but
+would force each later job to handle missing parents. The thresholds (one
+week of runtime, 120 years, 1874 as the first film) are deliberately wide:
+they catch encoding errors without removing real extreme cases.
+
+**Running at full scale.** The job runs on the full dataset on a laptop, in
+a 6 GB container. The first version failed on a teammate's machine with
+`Cannot allocate memory`: Parquet reads allocate large off-heap buffers that
+Java caches per thread. We limited the cached buffer size, capped off-heap
+memory at 1.5 GB, set the heap to 3 GB and used 4 parallel tasks instead of
+all cores. The full run then takes about 31 minutes.
 
 ## 2. Data exploration
 
@@ -227,7 +279,15 @@ coverage and exact identifier availability limit what can be collected.
 
 ### 4.1 Results and metrics
 
-<!-- TODO (Axel): add your own description and comments, without AI. -->
+*The comments in this section were written with AI assistance (see
+`PROJECT.md`).*
+
+The filter kept 75 of about 2,190 edits (3.4 %) and matched 53 different
+IMDb titles and people, with 15 to 20 matches in every full five-minute
+window. It therefore captures several events well within the required 15 to
+30 minutes. Titles account for about two thirds of the matches. Most
+entities are edited once; the most edited one, *Titanic*, received four
+edits.
 
 Run of 15 November 2026, 18:12–18:37 UTC (25 minutes), commands in
 `PROJECT.md`. All times below are UTC.
@@ -325,7 +385,16 @@ Run of 15 November 2026, 18:12–18:37 UTC (25 minutes), commands in
 
 ### 4.2 Late-arriving data
 
-<!-- TODO (Axel): add your own description and comments, without AI. -->
+*The comments in this section were written with AI assistance (see
+`PROJECT.md`).*
+
+Late data is handled with a 10-minute watermark on the edit's own timestamp.
+Spark keeps a five-minute window open until the newest event time it has
+seen is more than 10 minutes past the end of that window; an edit arriving
+after that is not added to the count. During the live run no edit arrived
+that late, so the streaming counts equal the counts over all stored edits.
+The controlled test below shows the other case: an edit sent 29 minutes
+late is stored, but it is not counted in its window.
 
 **Counts per window** (source: `project/output/4_edits_per_window`).
 `edits_streaming` is the last count emitted by the watermarked window query,
@@ -361,7 +430,44 @@ three micro-batches: at T, at T + 30 min, then at T + 1 min.
 
 ### Methodological Explanation
 
-<!-- TODO (Axel): write this section yourself, without AI. -->
+*This explanation was written with AI assistance (see `PROJECT.md`).*
+
+**Pipeline.** A producer on the host reads the public Wikimedia
+`recentchange` stream and forwards the edits of English Wikipedia articles
+to a Kafka topic. Filtering there removes about 96 % of the events before
+Kafka, since other wikis and non-article pages cannot match an IMDb name. A
+Spark Structured Streaming job reads the topic, parses the JSON with a fixed
+schema and joins each edit with a table of IMDb entities.
+
+**Matching.** An edit carries a page title and no IMDb identifier, so we
+match on the name: the page title without its final parenthesis, in lower
+case, against IMDb titles with at least 10,000 votes and the actors,
+actresses and directors credited on them. When several entities share a
+name we keep one (a title before a person, then the most votes), so one
+edit gives at most one match. The IMDb table does not change during the
+run, so a stream-static join with a broadcast table is enough and the join
+itself needs no state.
+
+**Alternatives and trade-offs.**
+
+- Matching through Wikidata, which stores the IMDb id of a page, would be
+  exact. It needs one more dataset or one API call per edit, which we could
+  not fit in the time available. Name matching is simple but produces false
+  positives: the pages "Fashion" or "Madagascar" match films of that name.
+- The 10,000-vote threshold trades recall for precision and for memory. Our
+  first version matched every person "known for" a popular title, about
+  1.3 million entities. It matched more edits, many of them wrong, and a
+  later run failed with an out-of-memory error after about nine minutes.
+  The table now has 82,674 rows.
+- A longer watermark would accept later edits but keep window state in
+  memory for longer. Ten minutes is a margin we chose, not a measured
+  value; in our run nothing arrived that late.
+- Counting each edit once required a review fix: a name shared by a title
+  and a person first produced two rows for one edit.
+
+**Limits.** The window counts are final only once the watermark has passed
+the window, so the last window of a run is partial. Stopping the job cancels
+the micro-batch in progress. Each run starts from a clean checkpoint.
 
 ## 5. Open question
 

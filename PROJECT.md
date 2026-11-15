@@ -193,5 +193,9 @@ docker compose down
   contributor table, and implementation and validation of exploration
   questions 2.1–2.8 (`jobs/20_exploration_part1.py` and
   `jobs/21_exploration_part2.py`).
-- All explanations and methodology in `REPORT.md` were written by the group
-  members without AI.
+- Claude Code was also used to write the explanations of sections 1 (data
+  preparation) and 4 (streaming) of `REPORT.md`, including their
+  Methodological Explanations. Each of these passages is marked in the
+  report.
+- The other explanations and methodology in `REPORT.md` were written by the
+  group members without AI.
