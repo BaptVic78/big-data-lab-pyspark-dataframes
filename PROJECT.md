@@ -85,6 +85,38 @@ Each step reads the output of the previous ones, so run them in order.
 | Ingest | `docker compose exec spark python /home/jovyan/jobs/00_ingest.py` | `data/parquet/` |
 | Data preparation (~30 min) | `docker compose exec spark python /home/jovyan/jobs/10_preparation.py` | `data/clean/`, `output/1_*` |
 | Streaming (25 min) | see "Streaming" below | `output/4_*` |
+| Exploration 2.5–2.8 | `docker compose exec spark python /home/jovyan/jobs/21_exploration_part2.py` | `output/2_5_*` through `output/2_8_*` |
+
+The second exploration job accepts selected question numbers and optional
+`--success-rating` (default 7), `--success-votes` (default 1000), and
+`--early-fraction` (default one third).
+
+- 2.5 requires at least three numbered seasons, each with at least ten
+  episodes with known positive season and episode numbers. Specials are
+  excluded. Rating extrema use rated episodes; ties qualify if a best
+  episode occurs in seasons 1–2 and a worst episode in the last season.
+- 2.6 uses non-missing language codes from original-title variants in
+  `title_akas` as a film-language proxy. IMDb title-language metadata does
+  not establish the spoken language of a film. Coverage counts and
+  film/actor/language evidence are exported alongside the 2+ and 3+
+  language actor lists. Success requires both configured thresholds.
+- 2.7 requires at least fifteen dated movie credits spanning twenty years.
+  Early career is the first third of the observed calendar-year span.
+  The best early rating must strictly exceed the best later rating; both
+  periods need a rated movie. Future releases are excluded.
+- 2.8 combines principal credits and crew arrays for actor, writer and
+  director roles. It compares each multi-talented person's mean rated-film
+  score for single-role and multiple-role projects. Unrated films remain
+  in the film counts and are excluded from rating means. The export also
+  lists multiple-role projects individually.
+
+Outputs include full CSV tables and Markdown previews of up to fifty rows.
+Run the focused boundary checks with
+`docker compose exec spark python /home/jovyan/jobs/test_exploration_part2.py`.
+The current local dataset has no usable original-title language for the
+successful cast movies. Empty 2.6 actor lists indicate missing language
+evidence; additional spoken-language metadata is needed to answer that
+question conclusively.
 
 A single preparation step can be re-run on its own by passing `profile`,
 `clean` or `summary` as an argument (`clean` must run before `summary`).
@@ -139,6 +171,8 @@ docker compose down
   (`jobs/10_preparation.py`) and its checks (`jobs/test_preparation.py`),
   and the streaming pipeline (`scripts/wikipedia_producer.py`,
   `jobs/40_streaming.py`, `jobs/test_streaming.py`).
-- An OpenAI coding assistant helped with PR review, setup verification, and the contributor table.
+- An OpenAI coding assistant helped with PR review, setup verification, the
+  contributor table, and implementation and validation of exploration
+  questions 2.5–2.8 (`jobs/21_exploration_part2.py`).
 - All explanations and methodology in `REPORT.md` were written by the group
   members without AI.
