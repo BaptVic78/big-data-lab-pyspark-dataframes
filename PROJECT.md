@@ -111,8 +111,9 @@ docker compose exec spark python /home/jovyan/jobs/40_streaming.py --minutes 25
 The producer reads the public Wikimedia `recentchange` stream, keeps edits to
 English Wikipedia articles and writes them to the Kafka topic
 `wikipedia-edits`. The job matches the normalised page title (suffix such as
-"(film)" removed, lower case) against IMDb titles and people with at least
-10,000 votes (`--min-votes` to change it), using a stream-static join. A
+"(film)" removed, lower case) against IMDb titles with at least 10,000 votes
+(`--min-votes` to change it) and the actors, actresses and directors credited
+on them, using a stream-static join. A
 10-minute watermark bounds how late an event may arrive and still be counted
 in its 5-minute window. Start the job right after the producer: it reads only
 new events unless `--from-beginning` is given. Checks without Kafka:

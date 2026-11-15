@@ -34,10 +34,13 @@ CHECKPOINT_DIR = DATA_DIR / "checkpoints" / "40_streaming"
 STREAM_OUT = OUTPUT_DIR / "4_matched_edits_stream"
 WINDOW_OUT = OUTPUT_DIR / "4_window_updates_stream"
 
-# Only well-known titles and people are matched, otherwise the broadcast
-# table would hold millions of rows and common words would match anything.
+# Only well-known titles and their cast and directors are matched. The
+# entity table is broadcast again for every micro-batch, so it must stay
+# small: with every person "known for" a popular title it had 1.3 million
+# rows and the driver ran out of heap after a few minutes of streaming.
 MIN_VOTES = 10000
 TITLE_TYPES = ["movie", "tvSeries", "tvMiniSeries"]
+PEOPLE_CATEGORIES = ["actor", "actress", "director"]
 
 WATERMARK = "10 minutes"  # how late an event may arrive and still be counted
 WINDOW = "5 minutes"
@@ -87,15 +90,20 @@ def build_entities(spark, min_votes=MIN_VOTES):
         "votes",
     )
 
-    # People are the ones "known for" a popular title; their weight is the
-    # votes of their best-known popular title.
+    # People are the actors, actresses and directors credited on a popular
+    # title; their weight is the votes of their most voted popular title.
+    credited = (
+        read_table(spark, "title_principals")
+        .filter(F.col("category").isin(PEOPLE_CATEGORIES))
+        .select("tconst", "nconst")
+        .join(F.broadcast(popular.select("tconst", "votes")), "tconst")
+        .groupBy("nconst")
+        .agg(F.max("votes").alias("votes"))
+    )
     people = (
         read_table(spark, "name_basics")
-        .select("nconst", "primaryName",
-                F.explode("knownForTitles").alias("tconst"))
-        .join(F.broadcast(popular.select("tconst", "votes")), "tconst")
-        .groupBy("nconst", "primaryName")
-        .agg(F.max("votes").alias("votes"))
+        .select("nconst", "primaryName")
+        .join(credited, "nconst")
         .select(
             normalize(F.col("primaryName")).alias("key"),
             F.lit("person").alias("entity_type"),
@@ -177,13 +185,15 @@ def window_update_writer(path, show=True):
     be read back exactly as the stateful query computed them.
     """
     def write(batch_df, batch_id):
-        batch_df.persist()
-        if show and not batch_df.isEmpty():
-            batch_df.orderBy("window_start", "entity_type").show(
+        # One Spark job per micro-batch: the few updated windows are
+        # collected once, then printed and written from the driver.
+        rows = batch_df.collect()
+        updates = batch_df.sparkSession.createDataFrame(rows, batch_df.schema)
+        if show and rows:
+            updates.orderBy("window_start", "entity_type").show(
                 truncate=False)
-        (batch_df.withColumn("batch_id", F.lit(batch_id))
+        (updates.withColumn("batch_id", F.lit(batch_id)).coalesce(1)
          .write.mode("append").parquet(str(path)))
-        batch_df.unpersist()
     return write
 
 
@@ -239,7 +249,10 @@ def main():
     shutil.rmtree(STREAM_OUT, ignore_errors=True)
     shutil.rmtree(WINDOW_OUT, ignore_errors=True)
 
-    entities = build_entities(spark, args.min_votes).cache()
+    # Collected once and rebuilt as a local table: each micro-batch then
+    # broadcasts these rows directly instead of re-planning the IMDb joins.
+    built = build_entities(spark, args.min_votes).drop("votes")
+    entities = spark.createDataFrame(built.collect(), built.schema).cache()
     print(f"matching against {entities.count()} IMDb titles and people",
           flush=True)
 
