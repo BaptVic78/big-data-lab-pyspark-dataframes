@@ -9,14 +9,25 @@ requests from their own GitHub account. Each person also writes the
 
 ## Who does what
 
+| Person | Tasks (one branch and PR each) | Reviewed by |
+| ------ | ------------------------------ | ----------- |
+| Axel | Project init ✅, Data preparation, Streaming | Nils |
+| Nils | Exploration questions 1–8 (two PRs: 2.1–2.4 and 2.5–2.8) | Victor |
+| Victor | Enrichment (Wikipedia scraping), Open question | Axel |
+
+PR #1 (project init) was reviewed and approved by Victor before this plan
+was agreed.
+
+### Branches
+
 | Owner | Task | Branch | `REPORT.md` section | Reviewer |
 | ----- | ---- | ------ | ------------------- | -------- |
-| Axel (axou947) | Project setup ✅ (PR #1) | `feat/project-init` | – | Victor |
+| Axel (axou947) | Project init ✅ (PR #1) | `feat/project-init` | – | Victor (done) |
 | Axel (axou947) | Data preparation | `feat/data-preparation` | 1 | Nils |
 | Axel (axou947) | Streaming | `feat/streaming` | 4 | Nils |
 | Nils (nilsgrd) | Exploration, questions 2.1–2.4 | `feat/exploration-part-1` | 2.1–2.4 | Victor |
 | Nils (nilsgrd) | Exploration, questions 2.5–2.8 | `feat/exploration-part-2` | 2.5–2.8 | Victor |
-| Victor (BaptVic78) | Data enrichment | `feat/enrichment` | 3 | Axel |
+| Victor (BaptVic78) | Enrichment (Wikipedia scraping) | `feat/enrichment` | 3 | Axel |
 | Victor (BaptVic78) | Open question | `feat/open-question` | 5 | Axel |
 | Axel (axou947) | Submission email to `joe@adaltas.com` | – | – | – |
 
