@@ -1,4 +1,5 @@
 """Offline checks for exact identifier matching and source extraction."""
+import csv
 import tempfile
 import unittest
 from pathlib import Path
@@ -70,6 +71,18 @@ class FetchTests(unittest.TestCase):
             path.write_text("entity_id,kind,label,year\ntt1,film,A,2000\ntt1,film,A,2000\n",
                             encoding="utf-8")
             self.assertEqual(len(list(request_rows(path))), 1)
+
+    def test_spark_csv_escaped_quotes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "requests.csv"
+            label = 'A "quoted", title'
+            with path.open("w", encoding="utf-8", newline="") as stream:
+                writer = csv.writer(stream, escapechar="\\", doublequote=False)
+                writer.writerow(["entity_id", "kind", "label", "year"])
+                writer.writerow(["tt1", "film", label, "2000"])
+            row = next(request_rows(path))
+            self.assertEqual(row["label"], label)
+            self.assertEqual(row["year"], "2000")
 
 
 if __name__ == "__main__":

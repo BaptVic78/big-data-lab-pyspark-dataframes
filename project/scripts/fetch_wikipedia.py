@@ -168,7 +168,7 @@ def request_rows(path):
     seen = set()
     for file in files:
         with file.open(encoding="utf-8", newline="") as stream:
-            for row in csv.DictReader(stream):
+            for row in csv.DictReader(stream, escapechar="\\"):
                 entity_id = row.get("entity_id", "")
                 if not re.fullmatch(r"(?:tt|nm)\d+", entity_id):
                     raise ValueError("Invalid IMDb identifier in request CSV")
