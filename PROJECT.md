@@ -5,7 +5,7 @@
 | Name           | GitHub username | Email           |
 | -------------- | --------------- | --------------- |
 | Nils GIRAUD    | nilsgrd         | TODO@edu.ece.fr |
-| Axel ALACACHE  | axou947         | TODO@edu.ece.fr |
+| Axel ALACACHE  | axou947         | axel.alacache@edu.ece.fr |
 | Victor ROULEAU | BaptVic78       | victor.rouleau@edu.ece.fr |
 
 All project code lives in the [`project/`](project/) directory. Results and
