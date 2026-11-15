@@ -84,6 +84,7 @@ Each step reads the output of the previous ones, so run them in order.
 | ---- | ------- | ------ |
 | Ingest | `docker compose exec spark python /home/jovyan/jobs/00_ingest.py` | `data/parquet/` |
 | Data preparation (~30 min) | `docker compose exec spark python /home/jovyan/jobs/10_preparation.py` | `data/clean/`, `output/1_*` |
+| Streaming (25 min) | see "Streaming" below | `output/4_*` |
 
 A single preparation step can be re-run on its own by passing `profile`,
 `clean` or `summary` as an argument (`clean` must run before `summary`).
@@ -94,7 +95,34 @@ Regression checks for the preparation step (real multi-value IMDb records):
 docker compose exec spark python /home/jovyan/jobs/test_preparation.py
 ```
 
-The other steps (preparation, exploration, enrichment, streaming, open
+### Streaming
+
+Needs the clean layer and the running containers. Two processes run at the
+same time, so use two terminals, both from `project/`:
+
+```bash
+# Terminal 1 (host): forward Wikipedia edits to Kafka for 27 minutes
+python scripts/wikipedia_producer.py --minutes 27
+
+# Terminal 2: Spark Structured Streaming job, stops itself after 25 minutes
+docker compose exec spark python /home/jovyan/jobs/40_streaming.py --minutes 25
+```
+
+The producer reads the public Wikimedia `recentchange` stream, keeps edits to
+English Wikipedia articles and writes them to the Kafka topic
+`wikipedia-edits`. The job matches the normalised page title (suffix such as
+"(film)" removed, lower case) against IMDb titles with at least 10,000 votes
+(`--min-votes` to change it) and the actors, actresses and directors credited
+on them, using a stream-static join. A
+10-minute watermark bounds how late an event may arrive and still be counted
+in its 5-minute window. Start the job right after the producer: it reads only
+new events unless `--from-beginning` is given. Checks without Kafka:
+
+```bash
+docker compose exec spark python /home/jovyan/jobs/test_streaming.py
+```
+
+The other steps (exploration, enrichment, open
 question) are added to this table by their pull requests.
 
 ## Stopping
@@ -108,7 +136,9 @@ docker compose down
 - Claude Code (Anthropic, Claude Opus 5.5) was used to help write code: the
   Docker setup (`compose.yaml`), the IMDb download and ingestion scripts, and
   the shared Spark helpers (`jobs/common.py`), and the data-preparation job
-  (`jobs/10_preparation.py`) and its checks (`jobs/test_preparation.py`).
+  (`jobs/10_preparation.py`) and its checks (`jobs/test_preparation.py`),
+  and the streaming pipeline (`scripts/wikipedia_producer.py`,
+  `jobs/40_streaming.py`, `jobs/test_streaming.py`).
 - An OpenAI coding assistant helped with PR review, setup verification, and the contributor table.
 - All explanations and methodology in `REPORT.md` were written by the group
   members without AI.
