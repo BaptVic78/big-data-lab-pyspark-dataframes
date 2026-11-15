@@ -88,6 +88,9 @@ Each step reads the output of the previous ones, so run them in order.
 | Streaming (25 min) | see "Streaming" below | `output/4_*` |
 | Exploration 2.1–2.4 | `docker compose exec spark python /home/jovyan/jobs/20_exploration_part1.py` | `output/2_1_*` through `output/2_4_*` |
 | Exploration 2.5–2.8 | `docker compose exec spark python /home/jovyan/jobs/21_exploration_part2.py` | `output/2_5_*` through `output/2_8_*` |
+| [Enrichment targets](project/ENRICHMENT.md) | `docker compose exec spark python /home/jovyan/jobs/30_enrichment.py prepare` | `data/enrichment/targets/`, `output/3_requests/` |
+| Enrichment fetch (host) | `python scripts/fetch_wikipedia.py` | `data/enrichment/wikipedia/` |
+| Enrichment joins | `docker compose exec spark python /home/jovyan/jobs/30_enrichment.py finalize` | `output/3_*` |
 
 The exploration job accepts question numbers to rerun selected queries, for
 example `python /home/jovyan/jobs/20_exploration_part1.py 2.2 2.3` inside the
