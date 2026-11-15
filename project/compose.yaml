@@ -34,8 +34,13 @@ services:
       - NB_GID=${GID:-1000}
       - CHOWN_EXTRA=/home/jovyan/work,/home/jovyan/jobs,/home/jovyan/data,/home/jovyan/output
       - CHOWN_EXTRA_OPTS=-R
-      # Read by jobs/common.py; lower it if Docker has less than ~7 GB.
-      - SPARK_DRIVER_MEMORY=4g
+      # Spark sizing, read by jobs/common.py. Fits the 6 GB mem_limit below:
+      # 3 GB heap + 1.5 GB off-heap + overhead, 4 parallel tasks.
+      - SPARK_DRIVER_MEMORY=3g
+      - SPARK_MAX_DIRECT_MEMORY=1536m
+      - SPARK_LOCAL_CORES=4
+      # Show job progress messages immediately in `docker compose exec`.
+      - PYTHONUNBUFFERED=1
       # Lets `python job.py` import pyspark outside of Jupyter.
       - PYTHONPATH=/usr/local/spark/python:/usr/local/spark/python/lib/py4j-0.10.9.9-src.zip:/home/jovyan/jobs
     volumes:

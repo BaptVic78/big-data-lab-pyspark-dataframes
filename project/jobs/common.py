@@ -31,13 +31,29 @@ TABLES = {
 
 
 def get_spark(app_name, kafka=False):
-    """Create (or reuse) a local SparkSession sized for a laptop."""
+    """Create (or reuse) a local SparkSession sized for a laptop.
+
+    Memory budget inside the 6 GB container: 3 GB heap + at most 1.5 GB of
+    direct (off-heap) buffers + JVM/Python overhead.
+
+    Parquet reads go through Java NIO, which allocates a temporary direct
+    buffer as large as each read (~128 MB) and, by default, keeps it cached
+    per thread forever. With many threads these cached buffers filled the
+    container ("Cannot allocate memory"), so caching is limited to 256 KB
+    buffers and parallelism is capped. Values can be overridden with
+    environment variables.
+    """
+    cores = os.environ.get("SPARK_LOCAL_CORES", "4")
     builder = (
         SparkSession.builder.appName(app_name)
-        .master("local[*]")
+        .master(f"local[{cores}]")
         .config("spark.driver.memory",
-                os.environ.get("SPARK_DRIVER_MEMORY", "4g"))
-        .config("spark.sql.shuffle.partitions", "64")
+                os.environ.get("SPARK_DRIVER_MEMORY", "3g"))
+        .config("spark.driver.extraJavaOptions",
+                "-XX:MaxDirectMemorySize="
+                + os.environ.get("SPARK_MAX_DIRECT_MEMORY", "1536m")
+                + " -Djdk.nio.maxCachedBufferSize=262144")
+        .config("spark.sql.shuffle.partitions", "128")
         .config("spark.sql.adaptive.enabled", "true")
         .config("spark.sql.session.timeZone", "UTC")
     )
@@ -54,6 +70,31 @@ def read_table(spark, name, layer="clean"):
     return spark.read.parquet(str(base / name))
 
 
+FEATURE_MIN_RUNTIME = 40  # minutes, Academy / AFI / BFI definition
+
+
+def feature_films(spark):
+    """Feature-length films: titleType 'movie' running over 40 minutes."""
+    from pyspark.sql import functions as F
+
+    return read_table(spark, "title_basics").filter(
+        (F.col("titleType") == "movie")
+        & (F.col("runtimeMinutes") > FEATURE_MIN_RUNTIME)
+    )
+
+
+def to_markdown(df, limit=50):
+    """Return the first ``limit`` rows of ``df`` as a Markdown table."""
+    rows = df.limit(limit).collect()
+    header = "| " + " | ".join(df.columns) + " |"
+    sep = "| " + " | ".join("---" for _ in df.columns) + " |"
+    body = [
+        "| " + " | ".join("" if v is None else str(v) for v in row) + " |"
+        for row in rows
+    ]
+    return "\n".join([header, sep] + body)
+
+
 def save_result(df, name, limit=None):
     """Save a result table as one CSV file under output/<name>/.
 
@@ -64,3 +105,8 @@ def save_result(df, name, limit=None):
         df = df.limit(limit)
     (df.coalesce(1).write.mode("overwrite")
        .option("header", "true").csv(str(OUTPUT_DIR / name)))
+    # Markdown preview (first 50 rows) ready to paste into REPORT.md.
+    saved = df.sparkSession.read.option("header", "true").csv(
+        str(OUTPUT_DIR / name))
+    (OUTPUT_DIR / f"{name}.md").write_text(to_markdown(saved) + "\n",
+                                           encoding="utf-8")
