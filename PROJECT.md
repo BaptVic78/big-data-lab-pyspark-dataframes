@@ -91,4 +91,9 @@ docker compose down
 
 ## Use of AI / LLM tools
 
+- Claude Code (Anthropic, Claude Opus 5.5) was used to help write code: the
+  Docker setup (`compose.yaml`), the IMDb download and ingestion scripts, and
+  the shared Spark helpers (`jobs/common.py`).
 - An OpenAI coding assistant helped with PR review, setup verification, and the contributor table.
+- All explanations and methodology in `REPORT.md` were written by the group
+  members without AI.
