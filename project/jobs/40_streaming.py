@@ -11,12 +11,17 @@ Run (the producer must be running on the host)::
 
 Outputs:
   * ``output/4_matched_edits_stream/``  Parquet, one row per matched edit
-  * ``output/4_matched_edits``          CSV + Markdown, matches per entity
-  * ``output/4_edits_per_window``       CSV + Markdown, matches per window
+  * ``output/4_window_updates_stream/`` Parquet, every update emitted by the
+                                        watermarked window query
+  * ``output/4_matched_edits``          CSV + Markdown, edits per entity
+  * ``output/4_edits_per_window``       CSV + Markdown, per window: the
+                                        watermarked streaming count, the count
+                                        over all stored edits, and the gap
 """
 import argparse
 import shutil
 
+from pyspark.sql import Window
 from pyspark.sql import functions as F
 from pyspark.sql.types import (BooleanType, LongType, StringType, StructField,
                                StructType)
@@ -27,6 +32,7 @@ KAFKA_SERVER = "kafka:19092"  # address of the broker inside the compose network
 TOPIC = "wikipedia-edits"
 CHECKPOINT_DIR = DATA_DIR / "checkpoints" / "40_streaming"
 STREAM_OUT = OUTPUT_DIR / "4_matched_edits_stream"
+WINDOW_OUT = OUTPUT_DIR / "4_window_updates_stream"
 
 # Only well-known titles and people are matched, otherwise the broadcast
 # table would hold millions of rows and common words would match anything.
@@ -62,8 +68,7 @@ def normalize(col):
 def build_entities(spark, min_votes=MIN_VOTES):
     """IMDb titles and people that edits are matched against.
 
-    One row per (key, entity_type): ``key`` is the normalised name,
-    ``imdb_id`` the most-voted entity carrying that name.
+    One row per ``key`` (the normalised name), see ``one_per_key``.
     """
     basics = read_table(spark, "title_basics")
     ratings = read_table(spark, "title_ratings")
@@ -100,15 +105,29 @@ def build_entities(spark, min_votes=MIN_VOTES):
         )
     )
 
-    # Several entities can share a name: keep the most voted one so that an
-    # edit is never duplicated by the join.
+    return one_per_key(
+        titles.unionByName(people).filter(F.length("key") > 2))
+
+
+def one_per_key(candidates):
+    """Keep exactly one entity per key, so an edit matches at most once.
+
+    Several entities can share a name, within a type (remakes) or across
+    types (the series "Doug" and a person named Doug). Deterministic order:
+      1. a title wins over a person: a title's votes are its own, while a
+         person only borrows the votes of the title they are known for;
+      2. then the most votes;
+      3. then the smallest IMDb id.
+    """
+    best_first = Window.partitionBy("key").orderBy(
+        F.when(F.col("entity_type") == "title", 0).otherwise(1),
+        F.desc("votes"),
+        F.asc("imdb_id"),
+    )
     return (
-        titles.unionByName(people)
-        .filter(F.length("key") > 2)
-        .groupBy("key", "entity_type")
-        .agg(F.max_by("imdb_id", "votes").alias("imdb_id"),
-             F.max_by("label", "votes").alias("label"),
-             F.max("votes").alias("votes"))
+        candidates.withColumn("rank", F.row_number().over(best_first))
+        .filter(F.col("rank") == 1)
+        .drop("rank")
     )
 
 
@@ -132,6 +151,78 @@ def match_edits(edits, entities):
     )
 
 
+def window_counts(matched):
+    """Matched edits per 5-minute window, with a watermark for late data.
+
+    The watermark tells Spark how long to keep a window open: an edit whose
+    window ended before (newest event time seen - 10 minutes) is dropped,
+    and the state of that window is freed.
+    """
+    return (
+        matched.withWatermark("event_time", WATERMARK)
+        .groupBy(F.window("event_time", WINDOW), "entity_type")
+        .agg(F.count("*").alias("edits"),
+             F.approx_count_distinct("imdb_id").alias("entities"))
+        .select(F.col("window.start").alias("window_start"),
+                F.col("window.end").alias("window_end"),
+                "entity_type", "edits", "entities")
+    )
+
+
+def window_update_writer(path, show=True):
+    """foreachBatch function storing every update of the window query.
+
+    In update mode each micro-batch emits the windows whose count changed.
+    They are appended with their batch id, so the final streaming counts can
+    be read back exactly as the stateful query computed them.
+    """
+    def write(batch_df, batch_id):
+        batch_df.persist()
+        if show and not batch_df.isEmpty():
+            batch_df.orderBy("window_start", "entity_type").show(
+                truncate=False)
+        (batch_df.withColumn("batch_id", F.lit(batch_id))
+         .write.mode("append").parquet(str(path)))
+        batch_df.unpersist()
+    return write
+
+
+def final_window_counts(spark, path):
+    """Last emitted count of each window: the watermarked streaming result."""
+    return (
+        spark.read.parquet(str(path))
+        .groupBy("window_start", "window_end", "entity_type")
+        .agg(F.max_by("edits", "batch_id").alias("edits_streaming"))
+    )
+
+
+def window_report(final_counts, matched_edits):
+    """Compare the watermarked counts with a batch count of all stored edits.
+
+    ``edits_all`` counts every matched edit of the Parquet sink, which sits
+    before the watermark and therefore also holds the late edits.
+    ``late_not_counted`` is the difference: edits that arrived too late for
+    the streaming count of their window.
+    """
+    all_edits = (
+        matched_edits.groupBy(F.window("event_time", WINDOW).alias("w"),
+                              "entity_type")
+        .agg(F.count("*").alias("edits_all"))
+        .select(F.col("w.start").alias("window_start"),
+                F.col("w.end").alias("window_end"), "entity_type",
+                "edits_all")
+    )
+    return (
+        final_counts.join(all_edits,
+                          ["window_start", "window_end", "entity_type"],
+                          "full_outer")
+        .na.fill(0, ["edits_streaming", "edits_all"])
+        .withColumn("late_not_counted",
+                    F.col("edits_all") - F.col("edits_streaming"))
+        .orderBy("window_start", "entity_type")
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--minutes", type=float, default=25,
@@ -146,6 +237,7 @@ def main():
     # Start from a clean slate: a stale checkpoint would resume old offsets.
     shutil.rmtree(CHECKPOINT_DIR, ignore_errors=True)
     shutil.rmtree(STREAM_OUT, ignore_errors=True)
+    shutil.rmtree(WINDOW_OUT, ignore_errors=True)
 
     entities = build_entities(spark, args.min_votes).cache()
     print(f"matching against {entities.count()} IMDb titles and people",
@@ -173,22 +265,11 @@ def main():
         .start()
     )
 
-    # 2. Matches per 5-minute window. The watermark tells Spark how long to
-    #    keep a window open for late events: an edit arriving more than
-    #    10 minutes behind the newest event time is dropped, and a window is
-    #    final once the watermark passes its end.
-    per_window = (
-        matched.withWatermark("event_time", WATERMARK)
-        .groupBy(F.window("event_time", WINDOW), "entity_type")
-        .agg(F.count("*").alias("edits"),
-             F.approx_count_distinct("imdb_id").alias("entities"))
-        .select(F.col("window.start").alias("window_start"),
-                F.col("window.end").alias("window_end"),
-                "entity_type", "edits", "entities")
-    )
-    to_console = (
-        per_window.writeStream.outputMode("update").format("console")
-        .option("truncate", "false")
+    # 2. Watermarked counts per 5-minute window. Every update is printed
+    #    and stored, so the exported counts are the ones of this query.
+    to_windows = (
+        window_counts(matched).writeStream.outputMode("update")
+        .foreachBatch(window_update_writer(WINDOW_OUT))
         .option("checkpointLocation", str(CHECKPOINT_DIR / "windows"))
         .trigger(processingTime="30 seconds")
         .queryName("edits_per_window")
@@ -197,7 +278,7 @@ def main():
 
     print(f"streaming for {args.minutes} minutes...", flush=True)
     spark.streams.awaitAnyTermination(timeout=int(args.minutes * 60))
-    for query in (to_parquet, to_console):
+    for query in (to_parquet, to_windows):
         query.stop()
 
     # Results of the run, ready for REPORT.md.
@@ -215,13 +296,10 @@ def main():
              F.max("event_time").alias("last_edit"))
         .orderBy(F.desc("edits"), "label"),
         "4_matched_edits")
+    # The two queries stop independently, so the last (partial) window can
+    # differ by one micro-batch between the two counts.
     save_result(
-        result.groupBy(F.window("event_time", WINDOW).alias("w"),
-                       "entity_type")
-        .agg(F.count("*").alias("edits"))
-        .select(F.col("w.start").alias("window_start"), "entity_type",
-                "edits")
-        .orderBy("window_start", "entity_type"),
+        window_report(final_window_counts(spark, WINDOW_OUT), result),
         "4_edits_per_window")
 
 
