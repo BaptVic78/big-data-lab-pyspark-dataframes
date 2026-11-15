@@ -6,7 +6,7 @@
 | -------------- | --------------- | --------------- |
 | Nils GIRAUD    | nilsgrd         | TODO@edu.ece.fr |
 | Axel ALACACHE  | axou947         | TODO@edu.ece.fr |
-| Victor ROULEAU | BaptVic78       | TODO@edu.ece.fr |
+| Victor ROULEAU | BaptVic78       | victor.rouleau@edu.ece.fr |
 
 All project code lives in the [`project/`](project/) directory. Results and
 methodology are in [`REPORT.md`](REPORT.md).
@@ -90,6 +90,7 @@ docker compose down
 
 ## Use of AI / LLM tools
 
+- OpenAI Codex assisted with PR review, setup verification, and the contributor table.
 - **Claude Code (Anthropic, model Claude Opus 5.5)** was used as a coding
   assistant for: the Docker/compose setup, the IMDb download and ingestion
   scripts, and the PySpark jobs (details are listed per pull request).
