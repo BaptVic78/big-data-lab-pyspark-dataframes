@@ -36,6 +36,8 @@ services:
       - CHOWN_EXTRA_OPTS=-R
       # Read by jobs/common.py; lower it if Docker has less than ~7 GB.
       - SPARK_DRIVER_MEMORY=4g
+      # Show job progress messages immediately in `docker compose exec`.
+      - PYTHONUNBUFFERED=1
       # Lets `python job.py` import pyspark outside of Jupyter.
       - PYTHONPATH=/usr/local/spark/python:/usr/local/spark/python/lib/py4j-0.10.9.9-src.zip:/home/jovyan/jobs
     volumes:

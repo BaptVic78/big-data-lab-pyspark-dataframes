@@ -54,6 +54,31 @@ def read_table(spark, name, layer="clean"):
     return spark.read.parquet(str(base / name))
 
 
+FEATURE_MIN_RUNTIME = 40  # minutes, Academy / AFI / BFI definition
+
+
+def feature_films(spark):
+    """Feature-length films: titleType 'movie' running over 40 minutes."""
+    from pyspark.sql import functions as F
+
+    return read_table(spark, "title_basics").filter(
+        (F.col("titleType") == "movie")
+        & (F.col("runtimeMinutes") > FEATURE_MIN_RUNTIME)
+    )
+
+
+def to_markdown(df, limit=50):
+    """Return the first ``limit`` rows of ``df`` as a Markdown table."""
+    rows = df.limit(limit).collect()
+    header = "| " + " | ".join(df.columns) + " |"
+    sep = "| " + " | ".join("---" for _ in df.columns) + " |"
+    body = [
+        "| " + " | ".join("" if v is None else str(v) for v in row) + " |"
+        for row in rows
+    ]
+    return "\n".join([header, sep] + body)
+
+
 def save_result(df, name, limit=None):
     """Save a result table as one CSV file under output/<name>/.
 
@@ -64,3 +89,8 @@ def save_result(df, name, limit=None):
         df = df.limit(limit)
     (df.coalesce(1).write.mode("overwrite")
        .option("header", "true").csv(str(OUTPUT_DIR / name)))
+    # Markdown preview (first 50 rows) ready to paste into REPORT.md.
+    saved = df.sparkSession.read.option("header", "true").csv(
+        str(OUTPUT_DIR / name))
+    (OUTPUT_DIR / f"{name}.md").write_text(to_markdown(saved) + "\n",
+                                           encoding="utf-8")
