@@ -19,6 +19,15 @@ def check_series(spark):
     assert queries.series_extremes(frame, basics, ratings).count() == 1
     incomplete = frame.filter("tconst != 'e2_10'")
     assert queries.series_extremes(incomplete, basics, ratings).count() == 0
+    # A known season must not disappear because its episode numbers are missing.
+    missing_number = spark.createDataFrame(
+        [("e4_unknown", "series", 4, None)], frame.schema)
+    assert queries.series_extremes(
+        frame.unionByName(missing_number), basics, ratings).count() == 0
+    # Episodes with a known season still count when episodeNumber is unknown.
+    unknown_numbers = frame.selectExpr(
+        "tconst", "parentTconst", "seasonNumber", "cast(null as bigint) as episodeNumber")
+    assert queries.series_extremes(unknown_numbers, basics, ratings).count() == 1
 
 
 def check_languages(spark):

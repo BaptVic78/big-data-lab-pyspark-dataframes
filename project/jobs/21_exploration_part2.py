@@ -21,8 +21,9 @@ def series_extremes(episodes, basics, ratings):
     are required. Rating ties qualify if a best episode exists in seasons
     1–2 and a worst episode exists in the last numbered season.
     """
-    numbered = episodes.filter((F.col("seasonNumber") >= 1)
-                               & (F.col("episodeNumber") >= 1))
+    # Season membership is known even when the episode number is missing.
+    # Filtering episodeNumber here could hide an entire last season.
+    numbered = episodes.filter(F.col("seasonNumber") >= 1)
     seasons = numbered.groupBy("parentTconst", "seasonNumber").agg(
         F.countDistinct("tconst").alias("episodes_in_season"))
     eligible = seasons.groupBy("parentTconst").agg(

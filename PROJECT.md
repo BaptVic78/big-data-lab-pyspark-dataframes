@@ -85,16 +85,30 @@ Each step reads the output of the previous ones, so run them in order.
 | Ingest | `docker compose exec spark python /home/jovyan/jobs/00_ingest.py` | `data/parquet/` |
 | Data preparation (~30 min) | `docker compose exec spark python /home/jovyan/jobs/10_preparation.py` | `data/clean/`, `output/1_*` |
 | Streaming (25 min) | see "Streaming" below | `output/4_*` |
+| Exploration 2.1–2.4 | `docker compose exec spark python /home/jovyan/jobs/20_exploration_part1.py` | `output/2_1_*` through `output/2_4_*` |
 | Exploration 2.5–2.8 | `docker compose exec spark python /home/jovyan/jobs/21_exploration_part2.py` | `output/2_5_*` through `output/2_8_*` |
+
+The exploration job accepts question numbers to rerun selected queries, for
+example `python /home/jovyan/jobs/20_exploration_part1.py 2.2 2.3` inside the
+Spark container. Question 2.1 uses feature films and an absolute population
+z-score greater than 2 (`--runtime-z-score` to change it). Questions 2.2 and
+2.3 rank genres by total IMDb votes over rated movies released in 1980–2025.
+Each movie contributes to every listed genre, so the comparison reports
+genre-assigned vote and film shares. Ties in votes are resolved by genre name.
+Question 2.4 requires exactly one movie rated at least 8 and at least two
+other rated movies averaging at most 6. Unrated movies do not enter these
+counts or averages. CSV outputs contain every result; Markdown previews
+contain the first 50 rows.
 
 The second exploration job accepts selected question numbers and optional
 `--success-rating` (default 7), `--success-votes` (default 1000), and
 `--early-fraction` (default one third).
 
 - 2.5 requires at least three numbered seasons, each with at least ten
-  episodes with known positive season and episode numbers. Specials are
-  excluded. Rating extrema use rated episodes; ties qualify if a best
-  episode occurs in seasons 1–2 and a worst episode in the last season.
+  episodes with a known positive season number, even when the episode
+  number is missing. Specials are excluded. Rating extrema use rated
+  episodes; ties qualify if a best episode occurs in seasons 1–2 and a
+  worst episode in the last season.
 - 2.6 uses non-missing language codes from original-title variants in
   `title_akas` as a film-language proxy. IMDb title-language metadata does
   not establish the spoken language of a film. Coverage counts and
@@ -173,6 +187,7 @@ docker compose down
   `jobs/40_streaming.py`, `jobs/test_streaming.py`).
 - An OpenAI coding assistant helped with PR review, setup verification, the
   contributor table, and implementation and validation of exploration
-  questions 2.5–2.8 (`jobs/21_exploration_part2.py`).
+  questions 2.1–2.8 (`jobs/20_exploration_part1.py` and
+  `jobs/21_exploration_part2.py`).
 - All explanations and methodology in `REPORT.md` were written by the group
   members without AI.
