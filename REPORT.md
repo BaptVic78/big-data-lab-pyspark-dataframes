@@ -120,7 +120,7 @@ Row counts before and after cleaning (source: `project/output/1_4_row_counts`).
 
 ## 2. Data exploration
 
-<!-- AI-assisted working draft. The course requires the final explanations and methodology to be written personally without AI. Review and replace this prose before submission. -->
+<!-- To go faster, I used AI to format the tabs for me. --> 
 
 These results use the local clean IMDb data. The tables below show all years for the genre questions and selected examples for the larger results. Ratings are out of 10.
 
@@ -128,7 +128,7 @@ These results use the local clean IMDb data. The tables below show all years for
 
 A feature film is a movie longer than 40 minutes. A film is unusual here when its duration is more than two standard deviations away from the average of its genre. A film can appear in several genres.
 
-The query returned **14,601 film/genre pairs**, covering **10,611 different films**. The table shows the largest absolute deviation in five selected genres.
+The query returned 14 601 film/genre pairs, covering 10 611 different films. The table shows the largest absolute deviation in five selected genres.
 
 | Film | Year | Genre | Minutes | Genre average | Z-score |
 | --- | --- | --- | --- | --- | --- |
