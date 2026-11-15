@@ -31,13 +31,29 @@ TABLES = {
 
 
 def get_spark(app_name, kafka=False):
-    """Create (or reuse) a local SparkSession sized for a laptop."""
+    """Create (or reuse) a local SparkSession sized for a laptop.
+
+    Memory budget inside the 6 GB container: 3 GB heap + at most 1.5 GB of
+    direct (off-heap) buffers + JVM/Python overhead.
+
+    Parquet reads go through Java NIO, which allocates a temporary direct
+    buffer as large as each read (~128 MB) and, by default, keeps it cached
+    per thread forever. With many threads these cached buffers filled the
+    container ("Cannot allocate memory"), so caching is limited to 256 KB
+    buffers and parallelism is capped. Values can be overridden with
+    environment variables.
+    """
+    cores = os.environ.get("SPARK_LOCAL_CORES", "4")
     builder = (
         SparkSession.builder.appName(app_name)
-        .master("local[*]")
+        .master(f"local[{cores}]")
         .config("spark.driver.memory",
-                os.environ.get("SPARK_DRIVER_MEMORY", "4g"))
-        .config("spark.sql.shuffle.partitions", "64")
+                os.environ.get("SPARK_DRIVER_MEMORY", "3g"))
+        .config("spark.driver.extraJavaOptions",
+                "-XX:MaxDirectMemorySize="
+                + os.environ.get("SPARK_MAX_DIRECT_MEMORY", "1536m")
+                + " -Djdk.nio.maxCachedBufferSize=262144")
+        .config("spark.sql.shuffle.partitions", "128")
         .config("spark.sql.adaptive.enabled", "true")
         .config("spark.sql.session.timeZone", "UTC")
     )

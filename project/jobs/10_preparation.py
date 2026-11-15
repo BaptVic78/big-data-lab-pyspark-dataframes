@@ -58,10 +58,14 @@ def as_bool(c):
             .otherwise(None).alias(c))
 
 
-def as_array(c):
-    """Comma-separated list -> array<string>; null when missing."""
+LIST_SEP = ","          # genres, directors, writers, professions, titles
+AKAS_SEP = "\u0002"     # title_akas.types / .attributes use the STX char
+
+
+def as_array(c, sep=LIST_SEP):
+    """``sep``-separated list -> array<string>; null when missing."""
     return (F.when(missing(c), None)
-            .otherwise(F.split(F.col(c), ",")).alias(c))
+            .otherwise(F.split(F.col(c), sep)).alias(c))
 
 
 class IssueLog:
@@ -163,8 +167,9 @@ def typed_tables(spark):
             as_array("primaryProfession"), as_array("knownForTitles")),
         "title_akas": raw["title_akas"].select(
             as_string("titleId"), as_int("ordering"), as_string("title"),
-            as_string("region"), as_string("language"), as_array("types"),
-            as_array("attributes"), as_bool("isOriginalTitle")),
+            as_string("region"), as_string("language"),
+            as_array("types", AKAS_SEP), as_array("attributes", AKAS_SEP),
+            as_bool("isOriginalTitle")),
     }, raw
 
 
