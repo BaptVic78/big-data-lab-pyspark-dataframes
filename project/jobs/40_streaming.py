@@ -211,8 +211,8 @@ def window_report(final_counts, matched_edits):
 
     ``edits_all`` counts every matched edit of the Parquet sink, which sits
     before the watermark and therefore also holds the late edits.
-    ``late_not_counted`` is the difference: edits that arrived too late for
-    the streaming count of their window.
+    ``count_difference`` is storage minus the streaming count. It includes
+    late events and differences in the two queries' shutdown offsets.
     """
     all_edits = (
         matched_edits.groupBy(F.window("event_time", WINDOW).alias("w"),
@@ -227,7 +227,7 @@ def window_report(final_counts, matched_edits):
                           ["window_start", "window_end", "entity_type"],
                           "full_outer")
         .na.fill(0, ["edits_streaming", "edits_all"])
-        .withColumn("late_not_counted",
+        .withColumn("count_difference",
                     F.col("edits_all") - F.col("edits_streaming"))
         .orderBy("window_start", "entity_type")
     )

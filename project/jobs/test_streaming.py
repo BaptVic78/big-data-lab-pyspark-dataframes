@@ -119,7 +119,7 @@ def check_late_event_dropped(spark):
         report = streaming.window_report(
             streaming.final_window_counts(spark, updates), all_matched)
         got = [(r.window_start.strftime("%H:%M"), r.edits_streaming,
-                r.edits_all, r.late_not_counted) for r in report.collect()]
+                r.edits_all, r.count_difference) for r in report.collect()]
         assert got == [("22:15", 1, 2, 1), ("22:45", 1, 1, 0)], got
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
