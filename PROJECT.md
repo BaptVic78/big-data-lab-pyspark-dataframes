@@ -91,4 +91,4 @@ docker compose down
 
 ## Use of AI / LLM tools
 
-- OpenAI Codex assisted with PR review, setup verification, and the contributor table.
+- An OpenAI coding assistant helped with PR review, setup verification, and the contributor table.
